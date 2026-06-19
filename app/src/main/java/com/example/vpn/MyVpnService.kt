@@ -14,6 +14,13 @@ import androidx.core.app.NotificationCompat
 class MyVpnService : VpnService() {
     private var vpnInterface: ParcelFileDescriptor? = null
 
+    private data class Config(
+        val serverIp: String,
+        val serverPort: Int,
+        val clientIp: String,
+        val vpnKey: String
+    )
+
     override fun onCreate() {
         super.onCreate()
         Log.i("MyVpnService", "onCreate")
@@ -36,13 +43,20 @@ class MyVpnService : VpnService() {
             return START_STICKY
         }
 
+        val config = loadConfig()
+        if (config == null) {
+            publishState(VpnState.ERROR, "Некорректные настройки VPN")
+            stopSelf()
+            return START_NOT_STICKY
+        }
+
         publishState(VpnState.CONNECTING, "VPN подключается...")
         startForeground(NOTIFICATION_ID, buildNotification("VPN подключается..."))
 
         val builder = Builder()
             .setSession("MyVPN")
             .setMtu(1380)
-            .addAddress("192.168.200.3", 24)
+            .addAddress(config.clientIp, 24)
             .addRoute("0.0.0.0", 0)
             .addDnsServer("8.8.8.8")
 
@@ -60,9 +74,9 @@ class MyVpnService : VpnService() {
 
         nativeStart(
             vpnInterface!!.fd,
-            "132.243.124.73",
-            51820,
-            "CvEE3TRqqNNpmxy+/kk07Qk9912ZyCqUlv0ay5006KY="
+            config.serverIp,
+            config.serverPort,
+            config.vpnKey
         )
 
         val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
@@ -88,6 +102,57 @@ class MyVpnService : VpnService() {
         Log.i("MyVpnService", "onDestroy")
         stopVpn()
         super.onDestroy()
+    }
+
+    private fun loadConfig(): Config? {
+        val preferences = getSharedPreferences(VpnConfig.PREFERENCES_NAME, Context.MODE_PRIVATE)
+
+        val serverIp = preferences.getString(
+            VpnConfig.KEY_SERVER_IP,
+            VpnConfig.DEFAULT_SERVER_IP
+        )?.trim().orEmpty()
+
+        val serverPort = preferences.getInt(
+            VpnConfig.KEY_SERVER_PORT,
+            VpnConfig.DEFAULT_SERVER_PORT
+        )
+
+        val clientIp = preferences.getString(
+            VpnConfig.KEY_CLIENT_IP,
+            VpnConfig.DEFAULT_CLIENT_IP
+        )?.trim().orEmpty()
+
+        val vpnKey = preferences.getString(
+            VpnConfig.KEY_VPN_KEY,
+            VpnConfig.DEFAULT_VPN_KEY
+        )?.trim().orEmpty()
+
+        if (serverIp.isEmpty()) {
+            Log.e("MyVpnService", "serverIp пустой")
+            return null
+        }
+
+        if (serverPort !in 1..65535) {
+            Log.e("MyVpnService", "serverPort некорректный: $serverPort")
+            return null
+        }
+
+        if (clientIp.isEmpty()) {
+            Log.e("MyVpnService", "clientIp пустой")
+            return null
+        }
+
+        if (vpnKey.isEmpty()) {
+            Log.e("MyVpnService", "vpnKey пустой")
+            return null
+        }
+
+        return Config(
+            serverIp = serverIp,
+            serverPort = serverPort,
+            clientIp = clientIp,
+            vpnKey = vpnKey
+        )
     }
 
     private fun stopVpn() {

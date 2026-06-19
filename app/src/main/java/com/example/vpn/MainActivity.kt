@@ -21,8 +21,12 @@ class MainActivity : AppCompatActivity() {
     private val vpnRequestCode = 100
     private val notificationPermissionRequestCode = 101
 
-    private val preferences by lazy {
+    private val statePreferences by lazy {
         getSharedPreferences(VpnState.PREFERENCES_NAME, Context.MODE_PRIVATE)
+    }
+
+    private val configPreferences by lazy {
+        getSharedPreferences(VpnConfig.PREFERENCES_NAME, Context.MODE_PRIVATE)
     }
 
     private val vpnStateReceiver = object : BroadcastReceiver() {
@@ -45,7 +49,12 @@ class MainActivity : AppCompatActivity() {
         setContentView(binding.root)
 
         requestNotificationPermissionIfNeeded()
+        loadConfigToUi()
         loadLastVpnState()
+
+        binding.saveConfigButton.setOnClickListener {
+            saveConfigFromUi(showSuccess = true)
+        }
 
         binding.startVpnButton.setOnClickListener {
             requestVpnPermissionAndStart()
@@ -123,6 +132,77 @@ class MainActivity : AppCompatActivity() {
         updateNotificationSettingsButtonVisibility()
     }
 
+    private fun loadConfigToUi() {
+        binding.serverIpEditText.setText(
+            configPreferences.getString(
+                VpnConfig.KEY_SERVER_IP,
+                VpnConfig.DEFAULT_SERVER_IP
+            )
+        )
+
+        binding.serverPortEditText.setText(
+            configPreferences.getInt(
+                VpnConfig.KEY_SERVER_PORT,
+                VpnConfig.DEFAULT_SERVER_PORT
+            ).toString()
+        )
+
+        binding.clientIpEditText.setText(
+            configPreferences.getString(
+                VpnConfig.KEY_CLIENT_IP,
+                VpnConfig.DEFAULT_CLIENT_IP
+            )
+        )
+
+        binding.vpnKeyEditText.setText(
+            configPreferences.getString(
+                VpnConfig.KEY_VPN_KEY,
+                VpnConfig.DEFAULT_VPN_KEY
+            )
+        )
+    }
+
+    private fun saveConfigFromUi(showSuccess: Boolean): Boolean {
+        val serverIp = binding.serverIpEditText.text.toString().trim()
+        val serverPortText = binding.serverPortEditText.text.toString().trim()
+        val clientIp = binding.clientIpEditText.text.toString().trim()
+        val vpnKey = binding.vpnKeyEditText.text.toString().trim()
+
+        if (serverIp.isEmpty()) {
+            applyVpnState(VpnState.ERROR, "Введите IP сервера")
+            return false
+        }
+
+        val serverPort = serverPortText.toIntOrNull()
+        if (serverPort == null || serverPort !in 1..65535) {
+            applyVpnState(VpnState.ERROR, "Введите корректный порт сервера")
+            return false
+        }
+
+        if (clientIp.isEmpty()) {
+            applyVpnState(VpnState.ERROR, "Введите IP клиента")
+            return false
+        }
+
+        if (vpnKey.isEmpty()) {
+            applyVpnState(VpnState.ERROR, "Введите ключ VPN")
+            return false
+        }
+
+        configPreferences.edit()
+            .putString(VpnConfig.KEY_SERVER_IP, serverIp)
+            .putInt(VpnConfig.KEY_SERVER_PORT, serverPort)
+            .putString(VpnConfig.KEY_CLIENT_IP, clientIp)
+            .putString(VpnConfig.KEY_VPN_KEY, vpnKey)
+            .apply()
+
+        if (showSuccess) {
+            applyVpnState(VpnState.DISCONNECTED, "Настройки сохранены")
+        }
+
+        return true
+    }
+
     private fun requestNotificationPermissionIfNeeded() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
             return
@@ -191,6 +271,10 @@ class MainActivity : AppCompatActivity() {
             return
         }
 
+        if (!saveConfigFromUi(showSuccess = false)) {
+            return
+        }
+
         applyVpnState(VpnState.CONNECTING, "Запрос VPN-разрешения...")
 
         val intent = VpnService.prepare(this)
@@ -226,10 +310,10 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun loadLastVpnState() {
-        val state = preferences.getString(VpnState.KEY_STATE, VpnState.DISCONNECTED)
+        val state = statePreferences.getString(VpnState.KEY_STATE, VpnState.DISCONNECTED)
             ?: VpnState.DISCONNECTED
 
-        val message = preferences.getString(VpnState.KEY_MESSAGE, null)
+        val message = statePreferences.getString(VpnState.KEY_MESSAGE, null)
             ?: messageForState(state)
 
         applyVpnState(state, message)
@@ -244,26 +328,31 @@ class MainActivity : AppCompatActivity() {
             VpnState.CONNECTING -> {
                 binding.startVpnButton.isEnabled = false
                 binding.stopVpnButton.isEnabled = true
+                binding.saveConfigButton.isEnabled = false
             }
 
             VpnState.CONNECTED -> {
                 binding.startVpnButton.isEnabled = false
                 binding.stopVpnButton.isEnabled = true
+                binding.saveConfigButton.isEnabled = false
             }
 
             VpnState.ERROR -> {
                 binding.startVpnButton.isEnabled = notificationAllowed
                 binding.stopVpnButton.isEnabled = false
+                binding.saveConfigButton.isEnabled = true
             }
 
             VpnState.DISCONNECTED -> {
                 binding.startVpnButton.isEnabled = notificationAllowed
                 binding.stopVpnButton.isEnabled = false
+                binding.saveConfigButton.isEnabled = true
             }
 
             else -> {
                 binding.startVpnButton.isEnabled = notificationAllowed
                 binding.stopVpnButton.isEnabled = false
+                binding.saveConfigButton.isEnabled = true
             }
         }
 
