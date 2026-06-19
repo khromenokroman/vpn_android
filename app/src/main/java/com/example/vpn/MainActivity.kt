@@ -184,6 +184,13 @@ class MainActivity : AppCompatActivity() {
                 VpnConfig.DEFAULT_VPN_KEY
             )
         )
+
+        binding.vpnMtuEditText.setText(
+            configPreferences.getInt(
+                VpnConfig.KEY_VPN_MTU,
+                VpnConfig.DEFAULT_VPN_MTU
+            ).toString()
+        )
     }
 
     private fun saveConfigFromUi(showSuccess: Boolean): Boolean {
@@ -191,6 +198,7 @@ class MainActivity : AppCompatActivity() {
         val serverPortText = binding.serverPortEditText.text.toString().trim()
         val clientIp = binding.clientIpEditText.text.toString().trim()
         val vpnKey = binding.vpnKeyEditText.text.toString().trim()
+        val vpnMtuText = binding.vpnMtuEditText.text.toString().trim()
 
         if (serverIp.isEmpty()) {
             applyVpnState(VpnState.ERROR, "Введите IP сервера")
@@ -213,11 +221,18 @@ class MainActivity : AppCompatActivity() {
             return false
         }
 
+        val vpnMtu = vpnMtuText.toIntOrNull()
+        if (vpnMtu == null || vpnMtu !in 576..1500) {
+            applyVpnState(VpnState.ERROR, "Введите корректный MTU (576-1500)")
+            return false
+        }
+
         configPreferences.edit()
             .putString(VpnConfig.KEY_SERVER_IP, serverIp)
             .putInt(VpnConfig.KEY_SERVER_PORT, serverPort)
             .putString(VpnConfig.KEY_CLIENT_IP, clientIp)
             .putString(VpnConfig.KEY_VPN_KEY, vpnKey)
+            .putInt(VpnConfig.KEY_VPN_MTU, vpnMtu)
             .apply()
 
         if (showSuccess) {

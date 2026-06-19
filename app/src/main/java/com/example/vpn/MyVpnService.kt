@@ -18,7 +18,8 @@ class MyVpnService : VpnService() {
         val serverIp: String,
         val serverPort: Int,
         val clientIp: String,
-        val vpnKey: String
+        val vpnKey: String,
+        val vpnMtu: Int
     )
 
     override fun onCreate() {
@@ -55,7 +56,7 @@ class MyVpnService : VpnService() {
 
         val builder = Builder()
             .setSession("MyVPN")
-            .setMtu(1380)
+            .setMtu(config.vpnMtu)
             .addAddress(config.clientIp, 24)
             .addRoute("0.0.0.0", 0)
             .addDnsServer("8.8.8.8")
@@ -70,7 +71,7 @@ class MyVpnService : VpnService() {
             return START_NOT_STICKY
         }
 
-        Log.i("MyVpnService", "VPN-интерфейс создан, fd=${vpnInterface!!.fd}")
+        Log.i("MyVpnService", "VPN-интерфейс создан, fd=${vpnInterface!!.fd} mtu=${config.vpnMtu} ip=${config.clientIp}")
 
         nativeStart(
             vpnInterface!!.fd,
@@ -147,6 +148,11 @@ class MyVpnService : VpnService() {
             VpnConfig.DEFAULT_VPN_KEY
         )?.trim().orEmpty()
 
+        val vpnMtu = preferences.getInt(
+            VpnConfig.KEY_VPN_MTU,
+            VpnConfig.DEFAULT_VPN_MTU
+        )
+
         if (serverIp.isEmpty()) {
             Log.e("MyVpnService", "serverIp пустой")
             return null
@@ -167,11 +173,17 @@ class MyVpnService : VpnService() {
             return null
         }
 
+        if (vpnMtu !in 576..1500) {
+            Log.e("MyVpnService", "MTU некорректный: $vpnMtu")
+            return null
+        }
+
         return Config(
             serverIp = serverIp,
             serverPort = serverPort,
             clientIp = clientIp,
-            vpnKey = vpnKey
+            vpnKey = vpnKey,
+            vpnMtu = vpnMtu
         )
     }
 

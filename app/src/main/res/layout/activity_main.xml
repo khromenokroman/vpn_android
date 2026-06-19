@@ -73,6 +73,14 @@
             android:inputType="textPassword"
             android:singleLine="true" />
 
+        <EditText
+            android:id="@+id/vpnMtuEditText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="MTU (например 1380)"
+            android:inputType="number"
+            android:singleLine="true" />
+
         <Button
             android:id="@+id/saveConfigButton"
             android:layout_width="match_parent"
