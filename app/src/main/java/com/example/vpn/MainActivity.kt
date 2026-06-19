@@ -1,12 +1,17 @@
 package com.example.vpn
 
+import android.Manifest
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.content.pm.PackageManager
+import android.net.Uri
 import android.net.VpnService
 import android.os.Build
 import android.os.Bundle
+import android.provider.Settings
+import android.view.View
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import com.example.vpn.databinding.ActivityMainBinding
@@ -14,6 +19,7 @@ import com.example.vpn.databinding.ActivityMainBinding
 class MainActivity : AppCompatActivity() {
     private lateinit var binding: ActivityMainBinding
     private val vpnRequestCode = 100
+    private val notificationPermissionRequestCode = 101
 
     private val preferences by lazy {
         getSharedPreferences(VpnState.PREFERENCES_NAME, Context.MODE_PRIVATE)
@@ -38,6 +44,7 @@ class MainActivity : AppCompatActivity() {
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
+        requestNotificationPermissionIfNeeded()
         loadLastVpnState()
 
         binding.startVpnButton.setOnClickListener {
@@ -46,6 +53,10 @@ class MainActivity : AppCompatActivity() {
 
         binding.stopVpnButton.setOnClickListener {
             stopVpnService()
+        }
+
+        binding.openNotificationSettingsButton.setOnClickListener {
+            openAppNotificationSettings()
         }
     }
 
@@ -66,6 +77,12 @@ class MainActivity : AppCompatActivity() {
         }
 
         loadLastVpnState()
+        updateUiForNotificationPermission()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        updateUiForNotificationPermission()
     }
 
     override fun onStop() {
@@ -83,7 +100,97 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<out String>,
+        grantResults: IntArray
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+
+        if (requestCode != notificationPermissionRequestCode) {
+            return
+        }
+
+        if (hasNotificationPermission()) {
+            loadLastVpnState()
+        } else {
+            applyVpnState(
+                VpnState.ERROR,
+                "Разрешите уведомления для работы VPN в фоне"
+            )
+        }
+
+        updateNotificationSettingsButtonVisibility()
+    }
+
+    private fun requestNotificationPermissionIfNeeded() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+            return
+        }
+
+        if (!hasNotificationPermission()) {
+            requestPermissions(
+                arrayOf(Manifest.permission.POST_NOTIFICATIONS),
+                notificationPermissionRequestCode
+            )
+        }
+    }
+
+    private fun hasNotificationPermission(): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+            return true
+        }
+
+        return ContextCompat.checkSelfPermission(
+            this,
+            Manifest.permission.POST_NOTIFICATIONS
+        ) == PackageManager.PERMISSION_GRANTED
+    }
+
+    private fun updateUiForNotificationPermission() {
+        updateNotificationSettingsButtonVisibility()
+
+        if (hasNotificationPermission()) {
+            loadLastVpnState()
+            return
+        }
+
+        applyVpnState(
+            VpnState.ERROR,
+            "Разрешите уведомления для работы VPN в фоне"
+        )
+    }
+
+    private fun updateNotificationSettingsButtonVisibility() {
+        binding.openNotificationSettingsButton.visibility =
+            if (hasNotificationPermission()) View.GONE else View.VISIBLE
+    }
+
+    private fun openAppNotificationSettings() {
+        val intent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
+                putExtra(Settings.EXTRA_APP_PACKAGE, packageName)
+            }
+        } else {
+            Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                data = Uri.parse("package:$packageName")
+            }
+        }
+
+        startActivity(intent)
+    }
+
     private fun requestVpnPermissionAndStart() {
+        if (!hasNotificationPermission()) {
+            applyVpnState(
+                VpnState.ERROR,
+                "Разрешите уведомления для работы VPN в фоне"
+            )
+            requestNotificationPermissionIfNeeded()
+            updateNotificationSettingsButtonVisibility()
+            return
+        }
+
         applyVpnState(VpnState.CONNECTING, "Запрос VPN-разрешения...")
 
         val intent = VpnService.prepare(this)
@@ -95,6 +202,15 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun startVpnService() {
+        if (!hasNotificationPermission()) {
+            applyVpnState(
+                VpnState.ERROR,
+                "Разрешите уведомления для работы VPN в фоне"
+            )
+            updateNotificationSettingsButtonVisibility()
+            return
+        }
+
         applyVpnState(VpnState.CONNECTING, "VPN запускается...")
         startService(Intent(this, MyVpnService::class.java))
     }
@@ -122,6 +238,8 @@ class MainActivity : AppCompatActivity() {
     private fun applyVpnState(state: String, message: String) {
         binding.sampleText.text = message
 
+        val notificationAllowed = hasNotificationPermission()
+
         when (state) {
             VpnState.CONNECTING -> {
                 binding.startVpnButton.isEnabled = false
@@ -134,20 +252,22 @@ class MainActivity : AppCompatActivity() {
             }
 
             VpnState.ERROR -> {
-                binding.startVpnButton.isEnabled = true
+                binding.startVpnButton.isEnabled = notificationAllowed
                 binding.stopVpnButton.isEnabled = false
             }
 
             VpnState.DISCONNECTED -> {
-                binding.startVpnButton.isEnabled = true
+                binding.startVpnButton.isEnabled = notificationAllowed
                 binding.stopVpnButton.isEnabled = false
             }
 
             else -> {
-                binding.startVpnButton.isEnabled = true
+                binding.startVpnButton.isEnabled = notificationAllowed
                 binding.stopVpnButton.isEnabled = false
             }
         }
+
+        updateNotificationSettingsButtonVisibility()
     }
 
     private fun messageForState(state: String): String {
