@@ -14,7 +14,14 @@ class MyVpnService : VpnService() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        Log.i("MyVpnService", "onStartCommand")
+        Log.i("MyVpnService", "onStartCommand action=${intent?.action}")
+
+        if (intent?.action == ACTION_STOP) {
+            Log.i("MyVpnService", "Получена команда остановки VPN")
+            stopVpn()
+            stopSelf()
+            return START_NOT_STICKY
+        }
 
         if (vpnInterface != null) {
             Log.i("MyVpnService", "VPN уже запущен")
@@ -55,10 +62,17 @@ class MyVpnService : VpnService() {
 
     override fun onDestroy() {
         Log.i("MyVpnService", "onDestroy")
+        stopVpn()
+        super.onDestroy()
+    }
+
+    private fun stopVpn() {
+        Log.i("MyVpnService", "stopVpn")
+
         nativeStop()
+
         vpnInterface?.close()
         vpnInterface = null
-        super.onDestroy()
     }
 
     private external fun nativeStart(
@@ -71,6 +85,8 @@ class MyVpnService : VpnService() {
     private external fun nativeStop()
 
     companion object {
+        const val ACTION_STOP = "com.example.vpn.STOP"
+
         init {
             System.loadLibrary("vpn")
         }
