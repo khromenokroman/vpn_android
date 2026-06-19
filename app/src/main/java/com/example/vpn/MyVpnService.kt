@@ -30,12 +30,14 @@ class MyVpnService : VpnService() {
             return START_NOT_STICKY
         }
 
-        startForeground(NOTIFICATION_ID, buildNotification("VPN подключается..."))
-
         if (vpnInterface != null) {
             Log.i("MyVpnService", "VPN уже запущен")
+            publishState(VpnState.CONNECTED, "VPN подключён")
             return START_STICKY
         }
+
+        publishState(VpnState.CONNECTING, "VPN подключается...")
+        startForeground(NOTIFICATION_ID, buildNotification("VPN подключается..."))
 
         val builder = Builder()
             .setSession("MyVPN")
@@ -48,6 +50,7 @@ class MyVpnService : VpnService() {
 
         if (vpnInterface == null) {
             Log.e("MyVpnService", "Не удалось создать VPN-интерфейс")
+            publishState(VpnState.ERROR, "Не удалось создать VPN-интерфейс")
             stopForeground(STOP_FOREGROUND_REMOVE)
             stopSelf()
             return START_NOT_STICKY
@@ -65,12 +68,20 @@ class MyVpnService : VpnService() {
         val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         notificationManager.notify(NOTIFICATION_ID, buildNotification("VPN подключён"))
 
+        publishState(VpnState.CONNECTED, "VPN подключён")
+
         return START_STICKY
     }
 
     fun protectSocket(fd: Int): Boolean {
         Log.i("MyVpnService", "protectSocket fd=$fd")
         return protect(fd)
+    }
+
+    override fun onRevoke() {
+        Log.i("MyVpnService", "onRevoke")
+        stopVpn()
+        super.onRevoke()
     }
 
     override fun onDestroy() {
@@ -88,6 +99,24 @@ class MyVpnService : VpnService() {
         vpnInterface = null
 
         stopForeground(STOP_FOREGROUND_REMOVE)
+
+        publishState(VpnState.DISCONNECTED, "VPN отключён")
+    }
+
+    private fun publishState(state: String, message: String) {
+        getSharedPreferences(VpnState.PREFERENCES_NAME, Context.MODE_PRIVATE)
+            .edit()
+            .putString(VpnState.KEY_STATE, state)
+            .putString(VpnState.KEY_MESSAGE, message)
+            .apply()
+
+        val intent = Intent(VpnState.ACTION_STATE_CHANGED).apply {
+            setPackage(packageName)
+            putExtra(VpnState.EXTRA_STATE, state)
+            putExtra(VpnState.EXTRA_MESSAGE, message)
+        }
+
+        sendBroadcast(intent)
     }
 
     private fun createNotificationChannel() {

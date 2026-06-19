@@ -1,10 +1,14 @@
 package com.example.vpn
 
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.net.VpnService
+import android.os.Build
 import android.os.Bundle
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
 import com.example.vpn.databinding.ActivityMainBinding
 
 class MainActivity : AppCompatActivity() {
@@ -12,7 +16,20 @@ class MainActivity : AppCompatActivity() {
     private val vpnRequestCode = 100
 
     private val preferences by lazy {
-        getSharedPreferences("vpn_state", Context.MODE_PRIVATE)
+        getSharedPreferences(VpnState.PREFERENCES_NAME, Context.MODE_PRIVATE)
+    }
+
+    private val vpnStateReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            if (intent?.action != VpnState.ACTION_STATE_CHANGED) {
+                return
+            }
+
+            val state = intent.getStringExtra(VpnState.EXTRA_STATE) ?: VpnState.DISCONNECTED
+            val message = intent.getStringExtra(VpnState.EXTRA_MESSAGE) ?: state
+
+            applyVpnState(state, message)
+        }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -21,11 +38,7 @@ class MainActivity : AppCompatActivity() {
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        val isRunning = preferences.getBoolean(KEY_VPN_RUNNING, false)
-        updateStatus(
-            text = if (isRunning) "VPN подключён" else "VPN отключён",
-            isRunning = isRunning
-        )
+        loadLastVpnState()
 
         binding.startVpnButton.setOnClickListener {
             requestVpnPermissionAndStart()
@@ -36,19 +49,42 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    override fun onStart() {
+        super.onStart()
+
+        val filter = IntentFilter(VpnState.ACTION_STATE_CHANGED)
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(vpnStateReceiver, filter, RECEIVER_NOT_EXPORTED)
+        } else {
+            ContextCompat.registerReceiver(
+                this,
+                vpnStateReceiver,
+                filter,
+                ContextCompat.RECEIVER_NOT_EXPORTED
+            )
+        }
+
+        loadLastVpnState()
+    }
+
+    override fun onStop() {
+        unregisterReceiver(vpnStateReceiver)
+        super.onStop()
+    }
+
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
 
         if (requestCode == vpnRequestCode && resultCode == RESULT_OK) {
             startVpnService()
         } else if (requestCode == vpnRequestCode) {
-            setVpnRunning(false)
-            updateStatus("VPN-разрешение не выдано", isRunning = false)
+            applyVpnState(VpnState.DISCONNECTED, "VPN-разрешение не выдано")
         }
     }
 
     private fun requestVpnPermissionAndStart() {
-        updateStatus("Запрос VPN-разрешения...", isRunning = false)
+        applyVpnState(VpnState.CONNECTING, "Запрос VPN-разрешения...")
 
         val intent = VpnService.prepare(this)
         if (intent != null) {
@@ -59,38 +95,68 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun startVpnService() {
-        setVpnRunning(true)
-        updateStatus("VPN запускается...", isRunning = true)
+        applyVpnState(VpnState.CONNECTING, "VPN запускается...")
         startService(Intent(this, MyVpnService::class.java))
-        updateStatus("VPN подключён", isRunning = true)
     }
 
     private fun stopVpnService() {
-        updateStatus("VPN отключается...", isRunning = true)
+        applyVpnState(VpnState.CONNECTING, "VPN отключается...")
 
         val intent = Intent(this, MyVpnService::class.java).apply {
             action = MyVpnService.ACTION_STOP
         }
 
         startService(intent)
-
-        setVpnRunning(false)
-        updateStatus("VPN отключён", isRunning = false)
     }
 
-    private fun setVpnRunning(isRunning: Boolean) {
-        preferences.edit()
-            .putBoolean(KEY_VPN_RUNNING, isRunning)
-            .apply()
+    private fun loadLastVpnState() {
+        val state = preferences.getString(VpnState.KEY_STATE, VpnState.DISCONNECTED)
+            ?: VpnState.DISCONNECTED
+
+        val message = preferences.getString(VpnState.KEY_MESSAGE, null)
+            ?: messageForState(state)
+
+        applyVpnState(state, message)
     }
 
-    private fun updateStatus(text: String, isRunning: Boolean) {
-        binding.sampleText.text = text
-        binding.startVpnButton.isEnabled = !isRunning
-        binding.stopVpnButton.isEnabled = isRunning
+    private fun applyVpnState(state: String, message: String) {
+        binding.sampleText.text = message
+
+        when (state) {
+            VpnState.CONNECTING -> {
+                binding.startVpnButton.isEnabled = false
+                binding.stopVpnButton.isEnabled = true
+            }
+
+            VpnState.CONNECTED -> {
+                binding.startVpnButton.isEnabled = false
+                binding.stopVpnButton.isEnabled = true
+            }
+
+            VpnState.ERROR -> {
+                binding.startVpnButton.isEnabled = true
+                binding.stopVpnButton.isEnabled = false
+            }
+
+            VpnState.DISCONNECTED -> {
+                binding.startVpnButton.isEnabled = true
+                binding.stopVpnButton.isEnabled = false
+            }
+
+            else -> {
+                binding.startVpnButton.isEnabled = true
+                binding.stopVpnButton.isEnabled = false
+            }
+        }
     }
 
-    companion object {
-        private const val KEY_VPN_RUNNING = "vpn_running"
+    private fun messageForState(state: String): String {
+        return when (state) {
+            VpnState.CONNECTING -> "VPN подключается..."
+            VpnState.CONNECTED -> "VPN подключён"
+            VpnState.ERROR -> "Ошибка VPN"
+            VpnState.DISCONNECTED -> "VPN отключён"
+            else -> "VPN отключён"
+        }
     }
 }
