@@ -28,7 +28,7 @@ static int g_tun_fd = -1;
 static int g_udp_fd = -1;
 
 static sockaddr_in g_server_addr{};
-static JavaVM* g_vm = nullptr;
+static JavaVM *g_vm = nullptr;
 static jobject g_service_obj = nullptr;
 
 static std::unique_ptr<Crypto> g_crypto;
@@ -39,10 +39,10 @@ static bool protectSocketFromJava(int fd) {
         return false;
     }
 
-    JNIEnv* env = nullptr;
+    JNIEnv *env = nullptr;
     bool attached = false;
 
-    jint getEnvResult = g_vm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6);
+    jint getEnvResult = g_vm->GetEnv(reinterpret_cast<void **>(&env), JNI_VERSION_1_6);
     if (getEnvResult == JNI_EDETACHED) {
         if (g_vm->AttachCurrentThread(&env, nullptr) != JNI_OK) {
             LOGE("Не удалось AttachCurrentThread");
@@ -83,7 +83,9 @@ static void tunToUdpLoop() {
         if (n > 0) {
             std::size_t encrypted_size = 0;
 
-            if (!g_crypto || !g_crypto->encrypt(plain_buffer, static_cast<std::size_t>(n), encrypted_buffer, encrypted_size)) {
+            if (!g_crypto ||
+                !g_crypto->encrypt(plain_buffer, static_cast<std::size_t>(n), encrypted_buffer,
+                                   encrypted_size)) {
                 LOGE("Ошибка шифрования пакета");
                 continue;
             }
@@ -95,9 +97,7 @@ static void tunToUdpLoop() {
                     0
             );
 
-            if (sent > 0) {
-                LOGI("TUN->UDP encrypted: plain=%zd, encrypted=%zu, sent=%zd", n, encrypted_size, sent);
-            } else if (errno != EINTR && errno != EAGAIN && errno != EWOULDBLOCK) {
+            if (sent < 0 && errno != EINTR && errno != EAGAIN && errno != EWOULDBLOCK) {
                 LOGE("send ошибка, errno=%d", errno);
             }
         } else if (n == 0) {
@@ -135,16 +135,16 @@ static void udpToTunLoop() {
         if (n > 0) {
             std::size_t plain_size = 0;
 
-            if (!g_crypto || !g_crypto->decrypt(encrypted_buffer, static_cast<std::size_t>(n), plain_buffer, plain_size)) {
+            if (!g_crypto ||
+                !g_crypto->decrypt(encrypted_buffer, static_cast<std::size_t>(n), plain_buffer,
+                                   plain_size)) {
                 LOGE("Ошибка расшифровки пакета, size=%zd", n);
                 continue;
             }
 
             ssize_t written = write(g_tun_fd, plain_buffer, plain_size);
 
-            if (written > 0) {
-                LOGI("UDP->TUN decrypted: encrypted=%zd, plain=%zu, written=%zd", n, plain_size, written);
-            } else if (errno != EINTR && errno != EAGAIN && errno != EWOULDBLOCK) {
+            if (written < 0 && errno != EINTR && errno != EAGAIN && errno != EWOULDBLOCK) {
                 LOGE("write TUN ошибка, errno=%d", errno);
             }
         } else if (n == 0) {
@@ -170,20 +170,20 @@ static void udpToTunLoop() {
 }
 
 extern "C" JNIEXPORT jint JNICALL
-JNI_OnLoad(JavaVM* vm, void*) {
+JNI_OnLoad(JavaVM *vm, void *) {
     g_vm = vm;
     return JNI_VERSION_1_6;
 }
 
 extern "C" JNIEXPORT jstring JNICALL
-Java_com_example_vpn_MainActivity_stringFromJNI(JNIEnv* env, jobject) {
+Java_com_example_vpn_MainActivity_stringFromJNI(JNIEnv *env, jobject) {
     std::string hello = "Hello from C++";
     return env->NewStringUTF(hello.c_str());
 }
 
 extern "C" JNIEXPORT void JNICALL
 Java_com_example_vpn_MyVpnService_nativeStart(
-        JNIEnv* env,
+        JNIEnv *env,
         jobject thiz,
         jint tunFd,
         jstring serverIp,
@@ -202,8 +202,8 @@ Java_com_example_vpn_MyVpnService_nativeStart(
         return;
     }
 
-    const char* server_ip_c = env->GetStringUTFChars(serverIp, nullptr);
-    const char* key_c = env->GetStringUTFChars(key, nullptr);
+    const char *server_ip_c = env->GetStringUTFChars(serverIp, nullptr);
+    const char *key_c = env->GetStringUTFChars(key, nullptr);
 
     if (!server_ip_c || !key_c) {
         LOGE("Не удалось получить serverIp или key");
@@ -259,8 +259,9 @@ Java_com_example_vpn_MyVpnService_nativeStart(
         env->ReleaseStringUTFChars(key, key_c);
         return;
     }
+
     if (connect(g_udp_fd,
-                reinterpret_cast<sockaddr*>(&g_server_addr),
+                reinterpret_cast<sockaddr *>(&g_server_addr),
                 sizeof(g_server_addr)) != 0) {
         LOGE("connect UDP ошибка, errno=%d", errno);
         close(g_udp_fd);
@@ -271,6 +272,7 @@ Java_com_example_vpn_MyVpnService_nativeStart(
         env->ReleaseStringUTFChars(key, key_c);
         return;
     }
+
     LOGI("UDP-сокет создан и защищён от VPN, server=%s:%d", server_ip_c, serverPort);
     LOGI("Crypto инициализирован");
 
@@ -284,7 +286,7 @@ Java_com_example_vpn_MyVpnService_nativeStart(
 }
 
 extern "C" JNIEXPORT void JNICALL
-Java_com_example_vpn_MyVpnService_nativeStop(JNIEnv* env, jobject) {
+Java_com_example_vpn_MyVpnService_nativeStop(JNIEnv *env, jobject) {
     LOGI("nativeStop вызван");
 
     if (!g_running) {
