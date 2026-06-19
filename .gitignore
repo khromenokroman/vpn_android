@@ -1,0 +1,53 @@
+# Gradle
+.gradle/
+build/
+*/build/
+
+# Android Studio / IntelliJ
+.idea/
+*.iml
+
+# Local machine config
+local.properties
+
+# Native Android build outputs
+.cxx/
+.externalNativeBuild/
+app/.cxx/
+app/.externalNativeBuild/
+
+# CMake build directories
+cmake-build-*/
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+compile_commands.json
+build.ninja
+.ninja_deps
+.ninja_log
+Makefile
+
+# APK / bundles
+*.apk
+*.aab
+*.ap_
+*.aar
+
+# Native binaries / objects
+*.so
+*.a
+*.o
+*.obj
+*.lo
+*.la
+
+# Logs
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# libsodium generated/build directories
+third_party/libsodium-android/
+third_party/libsodium-1.0.20/
