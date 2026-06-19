@@ -1,9 +1,15 @@
 package com.example.vpn
 
+import android.app.Notification
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.content.Context
 import android.content.Intent
 import android.net.VpnService
+import android.os.Build
 import android.os.ParcelFileDescriptor
 import android.util.Log
+import androidx.core.app.NotificationCompat
 
 class MyVpnService : VpnService() {
     private var vpnInterface: ParcelFileDescriptor? = null
@@ -11,6 +17,7 @@ class MyVpnService : VpnService() {
     override fun onCreate() {
         super.onCreate()
         Log.i("MyVpnService", "onCreate")
+        createNotificationChannel()
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -22,6 +29,8 @@ class MyVpnService : VpnService() {
             stopSelf()
             return START_NOT_STICKY
         }
+
+        startForeground(NOTIFICATION_ID, buildNotification("VPN подключается..."))
 
         if (vpnInterface != null) {
             Log.i("MyVpnService", "VPN уже запущен")
@@ -39,6 +48,7 @@ class MyVpnService : VpnService() {
 
         if (vpnInterface == null) {
             Log.e("MyVpnService", "Не удалось создать VPN-интерфейс")
+            stopForeground(STOP_FOREGROUND_REMOVE)
             stopSelf()
             return START_NOT_STICKY
         }
@@ -51,6 +61,9 @@ class MyVpnService : VpnService() {
             51820,
             "CvEE3TRqqNNpmxy+/kk07Qk9912ZyCqUlv0ay5006KY="
         )
+
+        val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        notificationManager.notify(NOTIFICATION_ID, buildNotification("VPN подключён"))
 
         return START_STICKY
     }
@@ -73,6 +86,36 @@ class MyVpnService : VpnService() {
 
         vpnInterface?.close()
         vpnInterface = null
+
+        stopForeground(STOP_FOREGROUND_REMOVE)
+    }
+
+    private fun createNotificationChannel() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
+            return
+        }
+
+        val channel = NotificationChannel(
+            NOTIFICATION_CHANNEL_ID,
+            "VPN service",
+            NotificationManager.IMPORTANCE_LOW
+        ).apply {
+            description = "VPN connection status"
+        }
+
+        val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        notificationManager.createNotificationChannel(channel)
+    }
+
+    private fun buildNotification(text: String): Notification {
+        return NotificationCompat.Builder(this, NOTIFICATION_CHANNEL_ID)
+            .setSmallIcon(R.drawable.ic_launcher_foreground)
+            .setContentTitle("VPN")
+            .setContentText(text)
+            .setOngoing(true)
+            .setOnlyAlertOnce(true)
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .build()
     }
 
     private external fun nativeStart(
@@ -86,6 +129,9 @@ class MyVpnService : VpnService() {
 
     companion object {
         const val ACTION_STOP = "com.example.vpn.STOP"
+
+        private const val NOTIFICATION_ID = 1
+        private const val NOTIFICATION_CHANNEL_ID = "vpn_service"
 
         init {
             System.loadLibrary("vpn")
