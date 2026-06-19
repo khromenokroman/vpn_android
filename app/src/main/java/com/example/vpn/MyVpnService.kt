@@ -92,6 +92,26 @@ class MyVpnService : VpnService() {
         return protect(fd)
     }
 
+    fun updateStats(txPackets: Long, txBytes: Long, rxPackets: Long, rxBytes: Long) {
+        getSharedPreferences(VpnState.PREFERENCES_NAME, Context.MODE_PRIVATE)
+            .edit()
+            .putLong(VpnState.KEY_TX_PACKETS, txPackets)
+            .putLong(VpnState.KEY_TX_BYTES, txBytes)
+            .putLong(VpnState.KEY_RX_PACKETS, rxPackets)
+            .putLong(VpnState.KEY_RX_BYTES, rxBytes)
+            .apply()
+
+        val intent = Intent(VpnState.ACTION_STATS_CHANGED).apply {
+            setPackage(packageName)
+            putExtra(VpnState.EXTRA_TX_PACKETS, txPackets)
+            putExtra(VpnState.EXTRA_TX_BYTES, txBytes)
+            putExtra(VpnState.EXTRA_RX_PACKETS, rxPackets)
+            putExtra(VpnState.EXTRA_RX_BYTES, rxBytes)
+        }
+
+        sendBroadcast(intent)
+    }
+
     override fun onRevoke() {
         Log.i("MyVpnService", "onRevoke")
         stopVpn()

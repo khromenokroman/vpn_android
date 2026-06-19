@@ -24,6 +24,15 @@
             android:textSize="22sp"
             android:textStyle="bold" />
 
+        <TextView
+            android:id="@+id/statsText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:gravity="center"
+            android:text="Отправлено: 0 B • Получено: 0 B"
+            android:textSize="14sp" />
+
         <EditText
             android:id="@+id/serverIpEditText"
             android:layout_width="match_parent"
@@ -48,6 +57,13 @@
             android:hint="IP клиента в VPN"
             android:inputType="text"
             android:singleLine="true" />
+
+        <TextView
+            android:id="@+id/clientIpHintText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="У каждого устройства должен быть свой IP, например: 192.168.200.3, 192.168.200.4"
+            android:textSize="12sp" />
 
         <EditText
             android:id="@+id/vpnKeyEditText"

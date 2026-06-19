@@ -23,15 +23,82 @@ static std::atomic<bool> g_running{false};
 
 static std::thread g_tun_to_udp_thread;
 static std::thread g_udp_to_tun_thread;
+static std::thread g_stats_thread;
 
 static int g_tun_fd = -1;
 static int g_udp_fd = -1;
 
 static sockaddr_in g_server_addr{};
-static JavaVM *g_vm = nullptr;
+static JavaVM* g_vm = nullptr;
 static jobject g_service_obj = nullptr;
 
 static std::unique_ptr<Crypto> g_crypto;
+
+static std::atomic<unsigned long long> g_tx_packets{0};
+static std::atomic<unsigned long long> g_tx_bytes{0};
+static std::atomic<unsigned long long> g_rx_packets{0};
+static std::atomic<unsigned long long> g_rx_bytes{0};
+
+static void sendStatsToJava() {
+    if (!g_vm || !g_service_obj) {
+        return;
+    }
+
+    JNIEnv* env = nullptr;
+    bool attached = false;
+
+    jint getEnvResult = g_vm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6);
+    if (getEnvResult == JNI_EDETACHED) {
+        if (g_vm->AttachCurrentThread(&env, nullptr) != JNI_OK) {
+            LOGE("sendStatsToJava: AttachCurrentThread не удался");
+            return;
+        }
+        attached = true;
+    } else if (getEnvResult != JNI_OK) {
+        LOGE("sendStatsToJava: GetEnv вернул ошибку");
+        return;
+    }
+
+    jclass cls = env->GetObjectClass(g_service_obj);
+    jmethodID method = env->GetMethodID(cls, "updateStats", "(JJJJ)V");
+    if (!method) {
+        LOGE("sendStatsToJava: не найден метод updateStats(JJJJ)V");
+        if (attached) g_vm->DetachCurrentThread();
+        return;
+    }
+
+    jlong tx_packets = static_cast<jlong>(g_tx_packets.load());
+    jlong tx_bytes = static_cast<jlong>(g_tx_bytes.load());
+    jlong rx_packets = static_cast<jlong>(g_rx_packets.load());
+    jlong rx_bytes = static_cast<jlong>(g_rx_bytes.load());
+
+    env->CallVoidMethod(g_service_obj, method, tx_packets, tx_bytes, rx_packets, rx_bytes);
+
+    if (env->ExceptionCheck()) {
+        env->ExceptionDescribe();
+        env->ExceptionClear();
+    }
+
+    if (attached) {
+        g_vm->DetachCurrentThread();
+    }
+}
+
+static void statsLoop() {
+    LOGI("statsLoop запущен");
+
+    while (g_running) {
+        std::this_thread::sleep_for(std::chrono::seconds(1));
+
+        if (!g_running) {
+            break;
+        }
+
+        sendStatsToJava();
+    }
+
+    LOGI("statsLoop остановлен");
+}
 
 static bool protectSocketFromJava(int fd) {
     if (!g_vm || !g_service_obj) {
@@ -39,10 +106,10 @@ static bool protectSocketFromJava(int fd) {
         return false;
     }
 
-    JNIEnv *env = nullptr;
+    JNIEnv* env = nullptr;
     bool attached = false;
 
-    jint getEnvResult = g_vm->GetEnv(reinterpret_cast<void **>(&env), JNI_VERSION_1_6);
+    jint getEnvResult = g_vm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6);
     if (getEnvResult == JNI_EDETACHED) {
         if (g_vm->AttachCurrentThread(&env, nullptr) != JNI_OK) {
             LOGE("Не удалось AttachCurrentThread");
@@ -83,9 +150,7 @@ static void tunToUdpLoop() {
         if (n > 0) {
             std::size_t encrypted_size = 0;
 
-            if (!g_crypto ||
-                !g_crypto->encrypt(plain_buffer, static_cast<std::size_t>(n), encrypted_buffer,
-                                   encrypted_size)) {
+            if (!g_crypto || !g_crypto->encrypt(plain_buffer, static_cast<std::size_t>(n), encrypted_buffer, encrypted_size)) {
                 LOGE("Ошибка шифрования пакета");
                 continue;
             }
@@ -97,7 +162,10 @@ static void tunToUdpLoop() {
                     0
             );
 
-            if (sent < 0 && errno != EINTR && errno != EAGAIN && errno != EWOULDBLOCK) {
+            if (sent > 0) {
+                g_tx_packets++;
+                g_tx_bytes += static_cast<unsigned long long>(sent);
+            } else if (sent < 0 && errno != EINTR && errno != EAGAIN && errno != EWOULDBLOCK) {
                 LOGE("send ошибка, errno=%d", errno);
             }
         } else if (n == 0) {
@@ -135,16 +203,17 @@ static void udpToTunLoop() {
         if (n > 0) {
             std::size_t plain_size = 0;
 
-            if (!g_crypto ||
-                !g_crypto->decrypt(encrypted_buffer, static_cast<std::size_t>(n), plain_buffer,
-                                   plain_size)) {
+            if (!g_crypto || !g_crypto->decrypt(encrypted_buffer, static_cast<std::size_t>(n), plain_buffer, plain_size)) {
                 LOGE("Ошибка расшифровки пакета, size=%zd", n);
                 continue;
             }
 
             ssize_t written = write(g_tun_fd, plain_buffer, plain_size);
 
-            if (written < 0 && errno != EINTR && errno != EAGAIN && errno != EWOULDBLOCK) {
+            if (written > 0) {
+                g_rx_packets++;
+                g_rx_bytes += static_cast<unsigned long long>(written);
+            } else if (written < 0 && errno != EINTR && errno != EAGAIN && errno != EWOULDBLOCK) {
                 LOGE("write TUN ошибка, errno=%d", errno);
             }
         } else if (n == 0) {
@@ -170,20 +239,20 @@ static void udpToTunLoop() {
 }
 
 extern "C" JNIEXPORT jint JNICALL
-JNI_OnLoad(JavaVM *vm, void *) {
+JNI_OnLoad(JavaVM* vm, void*) {
     g_vm = vm;
     return JNI_VERSION_1_6;
 }
 
 extern "C" JNIEXPORT jstring JNICALL
-Java_com_example_vpn_MainActivity_stringFromJNI(JNIEnv *env, jobject) {
+Java_com_example_vpn_MainActivity_stringFromJNI(JNIEnv* env, jobject) {
     std::string hello = "Hello from C++";
     return env->NewStringUTF(hello.c_str());
 }
 
 extern "C" JNIEXPORT void JNICALL
 Java_com_example_vpn_MyVpnService_nativeStart(
-        JNIEnv *env,
+        JNIEnv* env,
         jobject thiz,
         jint tunFd,
         jstring serverIp,
@@ -202,8 +271,8 @@ Java_com_example_vpn_MyVpnService_nativeStart(
         return;
     }
 
-    const char *server_ip_c = env->GetStringUTFChars(serverIp, nullptr);
-    const char *key_c = env->GetStringUTFChars(key, nullptr);
+    const char* server_ip_c = env->GetStringUTFChars(serverIp, nullptr);
+    const char* key_c = env->GetStringUTFChars(key, nullptr);
 
     if (!server_ip_c || !key_c) {
         LOGE("Не удалось получить serverIp или key");
@@ -261,7 +330,7 @@ Java_com_example_vpn_MyVpnService_nativeStart(
     }
 
     if (connect(g_udp_fd,
-                reinterpret_cast<sockaddr *>(&g_server_addr),
+                reinterpret_cast<sockaddr*>(&g_server_addr),
                 sizeof(g_server_addr)) != 0) {
         LOGE("connect UDP ошибка, errno=%d", errno);
         close(g_udp_fd);
@@ -279,14 +348,20 @@ Java_com_example_vpn_MyVpnService_nativeStart(
     env->ReleaseStringUTFChars(serverIp, server_ip_c);
     env->ReleaseStringUTFChars(key, key_c);
 
+    g_tx_packets = 0;
+    g_tx_bytes = 0;
+    g_rx_packets = 0;
+    g_rx_bytes = 0;
+
     g_running = true;
 
     g_tun_to_udp_thread = std::thread(tunToUdpLoop);
     g_udp_to_tun_thread = std::thread(udpToTunLoop);
+    g_stats_thread = std::thread(statsLoop);
 }
 
 extern "C" JNIEXPORT void JNICALL
-Java_com_example_vpn_MyVpnService_nativeStop(JNIEnv *env, jobject) {
+Java_com_example_vpn_MyVpnService_nativeStop(JNIEnv* env, jobject) {
     LOGI("nativeStop вызван");
 
     if (!g_running) {
@@ -313,6 +388,10 @@ Java_com_example_vpn_MyVpnService_nativeStop(JNIEnv *env, jobject) {
 
     if (g_udp_to_tun_thread.joinable()) {
         g_udp_to_tun_thread.join();
+    }
+
+    if (g_stats_thread.joinable()) {
+        g_stats_thread.join();
     }
 
     g_crypto.reset();

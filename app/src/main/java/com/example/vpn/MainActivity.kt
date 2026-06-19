@@ -42,6 +42,19 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private val vpnStatsReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            if (intent?.action != VpnState.ACTION_STATS_CHANGED) {
+                return
+            }
+
+            val txBytes = intent.getLongExtra(VpnState.EXTRA_TX_BYTES, 0L)
+            val rxBytes = intent.getLongExtra(VpnState.EXTRA_RX_BYTES, 0L)
+
+            applyStats(txBytes, rxBytes)
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -51,6 +64,7 @@ class MainActivity : AppCompatActivity() {
         requestNotificationPermissionIfNeeded()
         loadConfigToUi()
         loadLastVpnState()
+        loadLastStats()
 
         binding.saveConfigButton.setOnClickListener {
             saveConfigFromUi(showSuccess = true)
@@ -72,20 +86,29 @@ class MainActivity : AppCompatActivity() {
     override fun onStart() {
         super.onStart()
 
-        val filter = IntentFilter(VpnState.ACTION_STATE_CHANGED)
+        val stateFilter = IntentFilter(VpnState.ACTION_STATE_CHANGED)
+        val statsFilter = IntentFilter(VpnState.ACTION_STATS_CHANGED)
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            registerReceiver(vpnStateReceiver, filter, RECEIVER_NOT_EXPORTED)
+            registerReceiver(vpnStateReceiver, stateFilter, RECEIVER_NOT_EXPORTED)
+            registerReceiver(vpnStatsReceiver, statsFilter, RECEIVER_NOT_EXPORTED)
         } else {
             ContextCompat.registerReceiver(
                 this,
                 vpnStateReceiver,
-                filter,
+                stateFilter,
+                ContextCompat.RECEIVER_NOT_EXPORTED
+            )
+            ContextCompat.registerReceiver(
+                this,
+                vpnStatsReceiver,
+                statsFilter,
                 ContextCompat.RECEIVER_NOT_EXPORTED
             )
         }
 
         loadLastVpnState()
+        loadLastStats()
         updateUiForNotificationPermission()
     }
 
@@ -96,6 +119,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onStop() {
         unregisterReceiver(vpnStateReceiver)
+        unregisterReceiver(vpnStatsReceiver)
         super.onStop()
     }
 
@@ -317,6 +341,39 @@ class MainActivity : AppCompatActivity() {
             ?: messageForState(state)
 
         applyVpnState(state, message)
+    }
+
+    private fun loadLastStats() {
+        val txBytes = statePreferences.getLong(VpnState.KEY_TX_BYTES, 0L)
+        val rxBytes = statePreferences.getLong(VpnState.KEY_RX_BYTES, 0L)
+
+        applyStats(txBytes, rxBytes)
+    }
+
+    private fun applyStats(txBytes: Long, rxBytes: Long) {
+        val tx = formatBytes(txBytes)
+        val rx = formatBytes(rxBytes)
+
+        binding.statsText.text = "Отправлено: $tx • Получено: $rx"
+    }
+
+    private fun formatBytes(bytes: Long): String {
+        if (bytes < 1024) {
+            return "$bytes B"
+        }
+
+        val kb = bytes / 1024.0
+        if (kb < 1024) {
+            return String.format("%.1f KB", kb)
+        }
+
+        val mb = kb / 1024.0
+        if (mb < 1024) {
+            return String.format("%.1f MB", mb)
+        }
+
+        val gb = mb / 1024.0
+        return String.format("%.2f GB", gb)
     }
 
     private fun applyVpnState(state: String, message: String) {
