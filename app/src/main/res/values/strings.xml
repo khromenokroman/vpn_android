@@ -1,3 +1,65 @@
 <resources>
     <string name="app_name">PomaVPN</string>
+
+    <!-- Состояния полёта -->
+    <string name="state_ready">Готов к старту</string>
+    <string name="state_connecting">Стыковка...</string>
+    <string name="state_orbit">На орбите</string>
+    <string name="state_no_response">Нет связи с ЦУП</string>
+    <string name="state_landing">Посадка...</string>
+    <string name="state_accident">Авария</string>
+    <string name="state_disconnected">Готов к старту</string>
+
+    <!-- Сообщения событий нативной части -->
+    <string name="event_tunnel_up">Туннель установлен</string>
+    <string name="event_tunnel_restarted">Сервер перезапущен, туннель восстановлен</string>
+    <string name="event_tunnel_restored">Связь с сервером восстановлена</string>
+    <string name="event_clock_skew">Часы телефона расходятся с сервером на %1$d с, допустимо 60 с</string>
+    <string name="event_old_protocol">Сервер старой версии (до 0.5.0.0)</string>
+
+    <!-- Ошибки -->
+    <string name="error_start_failed">Не удалось запустить туннель (причина в журнале)</string>
+    <string name="error_fatal">Связь прервана: %1$s</string>
+    <string name="error_fatal_unknown">Связь прервана</string>
+    <string name="error_handshake_timeout">Сервер не ответил на стыковку за %1$d с</string>
+
+    <!-- Кнопка запуска -->
+    <string name="launch_start">ПУСК</string>
+    <string name="launch_stop">ПОСАДКА</string>
+    <string name="launch_button_description">Кнопка запуска и посадки VPN</string>
+
+    <!-- Телеметрия -->
+    <string name="telemetry_line1">▲ %1$s   ▼ %2$s</string>
+    <string name="telemetry_line2">Отброшено: %1$d</string>
+    <string name="telemetry_fmt">%1$s\n%2$s</string>
+    <string name="telemetry_empty">▲ 0 Б   ▼ 0 Б\nОтброшено: 0</string>
+    <string name="flight_time_fmt">Время в полёте: %1$s</string>
+    <string name="unit_bytes">Б</string>
+    <string name="unit_kb">КБ</string>
+    <string name="unit_mb">МБ</string>
+    <string name="unit_gb">ГБ</string>
+
+    <!-- Настройки -->
+    <string name="settings_title">Центр управления полётом</string>
+    <string name="settings_button_description">Настройки</string>
+    <string name="hint_server_ip">Адрес сервера</string>
+    <string name="hint_server_port">Порт</string>
+    <string name="hint_client_ip">Адрес в туннеле</string>
+    <string name="hint_client_ip_detail">У каждого устройства должен быть свой адрес, например: 192.168.200.2, 192.168.200.3</string>
+    <string name="hint_key">Ключ</string>
+    <string name="hint_key_detail">Содержимое файла /etc/poma-vpn/key сервера</string>
+    <string name="hint_mtu">MTU</string>
+    <string name="save_settings">Сохранить настройки</string>
+    <string name="settings_saved">Настройки сохранены</string>
+
+    <!-- Уведомление -->
+    <string name="notify_channel_name">VPN service</string>
+    <string name="notify_channel_description">Состояние VPN-подключения</string>
+    <string name="notify_connecting">PomaVPN: стыковка...</string>
+    <string name="notify_connected">PomaVPN: на орбите</string>
+    <string name="notify_no_response">PomaVPN: нет связи с ЦУП</string>
+
+    <!-- Прочее -->
+    <string name="vpn_permission_missing">VPN-разрешение не выдано</string>
+    <string name="notification_permission_hint">Разрешите уведомления, чтобы видеть статус полёта</string>
 </resources>
