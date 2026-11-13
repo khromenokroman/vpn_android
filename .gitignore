@@ -49,7 +49,7 @@ Makefile
 Thumbs.db
 
 # libsodium generated/build directories
-third_party/libsodium-android/
+third_party/libsodium-android
 third_party/libsodium-1.0.20/
 
 # Локальные правила и задания агентов
