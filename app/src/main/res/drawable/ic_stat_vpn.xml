@@ -4,20 +4,15 @@
     android:viewportWidth="24"
     android:viewportHeight="24"
     android:tint="#FFFFFFFF">
-    <!-- ракета, силуэт для статус-бара -->
+    <!-- значок питания, силуэт для статус-бара -->
     <path
-        android:fillColor="#FFFFFFFF"
-        android:pathData="M12,1.5c2.6,2.2 4,5.2 4,8.5l-2,2.5h-4l-2,-2.5c0,-3.3 1.4,-6.3 4,-8.5z" />
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="2.4"
+        android:strokeLineCap="round"
+        android:pathData="M15.9,8.4 A6,6 0 1,1 8.1,8.4" />
     <path
-        android:fillColor="#FFFFFFFF"
-        android:pathData="M6.5,11l1.8,1.8 -0.5,3.7 -2.3,-2.3z" />
-    <path
-        android:fillColor="#FFFFFFFF"
-        android:pathData="M17.5,11l-1.8,1.8 0.5,3.7 2.3,-2.3z" />
-    <path
-        android:fillColor="#FFFFFFFF"
-        android:pathData="M10.8,15.5h2.4l-0.7,3h-1z" />
-    <path
-        android:fillColor="#FFFFFFFF"
-        android:pathData="M12,19l1.2,2.4 -1.2,1.6 -1.2,-1.6z" />
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="2.4"
+        android:strokeLineCap="round"
+        android:pathData="M12,3.5 L12,10" />
 </vector>

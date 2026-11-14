@@ -3,27 +3,26 @@
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <!-- ракета, летящая вверх -->
+    <!-- мягкое свечение вокруг кольца -->
     <path
-        android:fillColor="#FFF4F7FB"
-        android:pathData="M54,26c7.5,6.3 11.5,15 11.5,24.5l-5.8,7.2h-11.4l-5.8,-7.2c0,-9.5 4,-18.2 11.5,-24.5z" />
+        android:strokeColor="#402FE6A7"
+        android:strokeWidth="10"
+        android:pathData="M54,16a38,38 0 1,0 0.01,0z" />
+    <!-- кольцо -->
     <path
-        android:fillColor="#FFE0455A"
-        android:pathData="M38,50l5.5,5.5 -1.5,11 -7,-7z" />
+        android:strokeColor="#FF2FE6A7"
+        android:strokeWidth="4.5"
+        android:pathData="M54,24a30,30 0 1,0 0.01,0z" />
+    <!-- значок питания: дуга с разрывом сверху -->
     <path
-        android:fillColor="#FFE0455A"
-        android:pathData="M70,50l-5.5,5.5 1.5,11 7,-7z" />
+        android:strokeColor="#FF7DF5C8"
+        android:strokeWidth="5"
+        android:strokeLineCap="round"
+        android:pathData="M64.3,43.7 A16,16 0 1,1 43.7,43.7" />
+    <!-- вертикальный штрих значка питания -->
     <path
-        android:fillColor="#FFE0455A"
-        android:pathData="M48.5,58h11l-3,7.5h-5z" />
-    <path
-        android:fillColor="#FF7FD8F7"
-        android:pathData="M54,38.5a6,6 0 1,0 0.001,0z" />
-    <!-- пламя -->
-    <path
-        android:fillColor="#FFFFB03A"
-        android:pathData="M50,66l4,9 4,-9z" />
-    <path
-        android:fillColor="#FFFFE08A"
-        android:pathData="M52,66l2,5.5 2,-5.5z" />
+        android:strokeColor="#FF7DF5C8"
+        android:strokeWidth="5"
+        android:strokeLineCap="round"
+        android:pathData="M54,34.4 L54,51.5" />
 </vector>

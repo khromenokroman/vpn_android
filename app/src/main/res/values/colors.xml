@@ -1,12 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="space_background">#FF070B16</color>
-    <color name="star_white">#FFF4F7FB</color>
+    <color name="bg_gradient_top">#FF111B2E</color>
+    <color name="bg_gradient_bottom">#FF070B16</color>
+    <color name="text_primary">#FFF4F7FB</color>
     <color name="message_gray">#FF9AA7BD</color>
-    <color name="accent_orange">#FFFFB03A</color>
+    <color name="ring_dim">#FF4A5568</color>
+    <color name="accent_mint">#FF2FE6A7</color>
+    <color name="accent_yellow">#FFFFC94D</color>
     <color name="accent_red">#FFE0455A</color>
     <color name="accent_blue">#FF7FD8F7</color>
-    <color name="planet_dark">#FF131C33</color>
+    <color name="panel_dark">#FF141D2E</color>
 
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>

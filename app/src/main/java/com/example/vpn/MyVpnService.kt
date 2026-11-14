@@ -17,8 +17,8 @@ class MyVpnService : VpnService() {
     private var vpnInterface: ParcelFileDescriptor? = null
 
     /**
-     * @brief true, если сервер ответил на стыковку (EV_TUNNEL_UP/RESTARTED/RESTORED).
-     * Таймаут стыковки по расписанию проверяет этот флаг.
+     * @brief true, если сервер ответил на подключение (EV_TUNNEL_UP/RESTARTED/RESTORED).
+     * Таймаут подключения по расписанию проверяет этот флаг.
      */
     private var tunnelEstablished = false
 
@@ -27,12 +27,12 @@ class MyVpnService : VpnService() {
 
     private val mainHandler = Handler(Looper.getMainLooper())
 
-    /** @brief Таймаут стыковки: не дождались ответа сервера - ERROR и остановка VPN. */
+    /** @brief Таймаут подключения: не дождались ответа сервера - ERROR и остановка VPN. */
     private val handshakeTimeoutRunnable = Runnable {
         if (tunnelEstablished) {
             return@Runnable
         }
-        Log.w("MyVpnService", "Сервер не ответил на стыковку за $HANDSHAKE_TIMEOUT_SEC с")
+        Log.w("MyVpnService", "Сервер не ответил на подключение за $HANDSHAKE_TIMEOUT_SEC с")
         fatalErrorPublished = true
         stopVpn(publishDisconnected = false)
         publishState(VpnState.ERROR, getString(R.string.error_handshake_timeout, HANDSHAKE_TIMEOUT_SEC))
