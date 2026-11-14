@@ -31,12 +31,8 @@ class MainActivity : AppCompatActivity() {
 
     private var currentState = VpnState.DISCONNECTED
     private var connectStartMs = 0L
-    private var countdownStage = 0
-    private var landingPosted = false
 
     private var panelAnimator: ValueAnimator? = null
-    private var countdownAnimator: ValueAnimator? = null
-    private var launchPulseAnimator: ValueAnimator? = null
 
     private val animationsEnabled: Boolean by lazy {
         try {
@@ -92,10 +88,8 @@ class MainActivity : AppCompatActivity() {
         loadLastVpnState()
         loadLastStats()
 
-        binding.spaceView.onRocketClick = { onRocketClicked() }
-
-        binding.launchButton.setOnClickListener {
-            onRocketClicked()
+        binding.connectButton.setOnClickListener {
+            onConnectClicked()
         }
 
         binding.settingsButton.setOnClickListener {
@@ -137,6 +131,16 @@ class MainActivity : AppCompatActivity() {
         loadLastStats()
     }
 
+    override fun onResume() {
+        super.onResume()
+        binding.connectButton.resumeAnimations()
+    }
+
+    override fun onPause() {
+        binding.connectButton.pauseAnimations()
+        super.onPause()
+    }
+
     override fun onStop() {
         unregisterReceiver(vpnStateReceiver)
         unregisterReceiver(vpnStatsReceiver)
@@ -146,8 +150,6 @@ class MainActivity : AppCompatActivity() {
     override fun onDestroy() {
         handler.removeCallbacksAndMessages(null)
         panelAnimator?.cancel()
-        countdownAnimator?.cancel()
-        stopLaunchPulse()
         super.onDestroy()
     }
 
@@ -179,84 +181,20 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    /** @brief Тап по ракете: старт с обратным отсчётом или посадка. */
-    private fun onRocketClicked() {
-        when (currentState) {
-            VpnState.DISCONNECTED, VpnState.ERROR -> beginCountdown()
-            VpnState.CONNECTED, VpnState.NO_RESPONSE -> beginLanding()
-            VpnState.CONNECTING -> {
-                if (countdownStage > 0) {
-                    skipCountdown()
-                }
-            }
-        }
-    }
-
-    private fun beginCountdown() {
-        if (countdownStage > 0) {
-            return
-        }
+    /** @brief Тап по кнопке подключения: подключение, отключение или отмена подключения. */
+    private fun onConnectClicked() {
         vibrate()
-        applyVpnState(VpnState.CONNECTING, "")
-        countdownStage = 3
-        showCountdownStage()
-    }
-
-    private fun showCountdownStage() {
-        if (countdownStage <= 0) {
-            return
-        }
-
-        binding.countdownText.text = countdownStage.toString()
-        binding.countdownText.visibility = View.VISIBLE
-        binding.countdownText.scaleX = 1f
-        binding.countdownText.scaleY = 1f
-
-        if (!animationsEnabled) {
-            handler.postDelayed({ tickCountdown() }, 700L)
-            return
-        }
-
-        countdownAnimator = ValueAnimator.ofFloat(1.6f, 1f).apply {
-            duration = 650L
-            addUpdateListener {
-                val s = it.animatedValue as Float
-                binding.countdownText.scaleX = s
-                binding.countdownText.scaleY = s
+        when (currentState) {
+            VpnState.DISCONNECTED, VpnState.ERROR -> requestVpnPermissionAndStart()
+            VpnState.CONNECTED, VpnState.NO_RESPONSE -> {
+                applyVpnState(VpnState.CONNECTING, getString(R.string.state_disconnecting))
+                stopVpnService()
             }
-            start()
+            VpnState.CONNECTING -> {
+                stopVpnService()
+                applyVpnState(VpnState.DISCONNECTED, "")
+            }
         }
-        handler.postDelayed({ tickCountdown() }, 700L)
-    }
-
-    private fun tickCountdown() {
-        if (countdownStage <= 0) {
-            return
-        }
-        countdownStage--
-        if (countdownStage > 0) {
-            showCountdownStage()
-        } else {
-            binding.countdownText.visibility = View.GONE
-            requestVpnPermissionAndStart()
-        }
-    }
-
-    private fun skipCountdown() {
-        handler.removeCallbacksAndMessages(null)
-        countdownStage = 0
-        binding.countdownText.visibility = View.GONE
-        requestVpnPermissionAndStart()
-    }
-
-    private fun beginLanding() {
-        if (landingPosted) {
-            return
-        }
-        landingPosted = true
-        binding.spaceView.setState(SpaceFlightView.FlightState.LANDING)
-        applyVpnState(VpnState.CONNECTING, getString(R.string.state_landing))
-        stopVpnService()
     }
 
     private fun requestVpnPermissionAndStart() {
@@ -267,6 +205,7 @@ class MainActivity : AppCompatActivity() {
 
         val intent = VpnService.prepare(this)
         if (intent != null) {
+            applyVpnState(VpnState.CONNECTING, getString(R.string.state_connecting))
             startActivityForResult(intent, vpnRequestCode)
         } else {
             startVpnService()
@@ -274,7 +213,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun startVpnService() {
-        applyVpnState(VpnState.CONNECTING, "")
+        applyVpnState(VpnState.CONNECTING, getString(R.string.state_connecting))
         startService(Intent(this, MyVpnService::class.java))
     }
 
@@ -466,11 +405,11 @@ class MainActivity : AppCompatActivity() {
         )
 
         if (currentState == VpnState.CONNECTED || currentState == VpnState.NO_RESPONSE) {
-            updateFlightTimer()
+            updateConnectionTimer()
         }
     }
 
-    private fun updateFlightTimer() {
+    private fun updateConnectionTimer() {
         val elapsedSec = ((System.currentTimeMillis() - connectStartMs).coerceAtLeast(0L)) / 1000L
         val hours = elapsedSec / 3600
         val minutes = (elapsedSec % 3600) / 60
@@ -482,7 +421,7 @@ class MainActivity : AppCompatActivity() {
             String.format("%02d:%02d", minutes, seconds)
         }
 
-        binding.timerText.text = getString(R.string.flight_time_fmt, text)
+        binding.timerText.text = getString(R.string.connection_time_fmt, text)
     }
 
     /** @brief Форматирует байты в «Б/КБ/МБ/ГБ»; разделитель десятичной части - по локали. */
@@ -516,106 +455,68 @@ class MainActivity : AppCompatActivity() {
     private fun applyVpnState(state: String, message: String) {
         val previousState = currentState
         currentState = state
-        landingPosted = false
 
-        updateLaunchButton(state)
+        updateConnectButton(state)
 
         when (state) {
             VpnState.CONNECTING -> {
-                if (countdownStage <= 0) {
-                    binding.spaceView.setState(
-                        if (message == getString(R.string.state_landing)) {
-                            SpaceFlightView.FlightState.LANDING
-                        } else {
-                            SpaceFlightView.FlightState.LAUNCH
-                        }
-                    )
-                    binding.statusText.text = if (message.isEmpty()) {
-                        getString(R.string.state_connecting)
-                    } else {
-                        message
-                    }
+                binding.statusText.text = if (message.isEmpty()) {
+                    getString(R.string.state_connecting)
+                } else {
+                    message
                 }
                 showMessage(null)
                 binding.timerText.visibility = View.GONE
             }
 
             VpnState.CONNECTED -> {
-                binding.spaceView.setState(SpaceFlightView.FlightState.ORBIT)
-                binding.statusText.text = getString(R.string.state_orbit)
+                binding.statusText.text = getString(R.string.state_connected)
                 if (previousState != VpnState.CONNECTED) {
                     connectStartMs = System.currentTimeMillis()
                 }
                 binding.timerText.visibility = View.VISIBLE
-                updateFlightTimer()
+                updateConnectionTimer()
                 showMessage(null)
             }
 
             VpnState.NO_RESPONSE -> {
-                binding.spaceView.setState(SpaceFlightView.FlightState.NO_SIGNAL)
                 binding.statusText.text = getString(R.string.state_no_response)
                 binding.timerText.visibility = View.VISIBLE
-                updateFlightTimer()
+                updateConnectionTimer()
                 showMessage(null)
             }
 
             VpnState.ERROR -> {
-                binding.spaceView.setState(SpaceFlightView.FlightState.ERROR)
-                binding.statusText.text = getString(R.string.state_accident)
+                binding.statusText.text = getString(R.string.state_error)
                 binding.timerText.visibility = View.GONE
                 showMessage(message.ifEmpty { null })
             }
 
             else -> { // DISCONNECTED
-                binding.spaceView.setState(SpaceFlightView.FlightState.IDLE)
-                binding.statusText.text = getString(R.string.state_ready)
+                binding.statusText.text = getString(R.string.state_disconnected)
                 binding.timerText.visibility = View.GONE
                 showMessage(null)
             }
         }
     }
 
-    /** @brief Кнопка «ПУСК»/«ПОСАДКА»: текст по состоянию, в покое мягко пульсирует. */
-    private fun updateLaunchButton(state: String) {
-        binding.launchButtonText.text = when (state) {
-            VpnState.CONNECTED, VpnState.NO_RESPONSE -> getString(R.string.launch_stop)
-            else -> getString(R.string.launch_start)
+    /** @brief Внешний вид и описание кнопки подключения по состоянию VPN. */
+    private fun updateConnectButton(state: String) {
+        val (buttonState, description) = when (state) {
+            VpnState.CONNECTED -> ConnectButtonView.ButtonState.CONNECTED to
+                getString(R.string.connect_cd_stop)
+            VpnState.CONNECTING -> ConnectButtonView.ButtonState.CONNECTING to
+                getString(R.string.connect_cd_connecting)
+            VpnState.NO_RESPONSE -> ConnectButtonView.ButtonState.NO_RESPONSE to
+                getString(R.string.connect_cd_no_response)
+            VpnState.ERROR -> ConnectButtonView.ButtonState.ERROR to
+                getString(R.string.connect_cd_error)
+            else -> ConnectButtonView.ButtonState.DISCONNECTED to
+                getString(R.string.connect_cd_start)
         }
 
-        binding.launchButton.isEnabled = state != VpnState.CONNECTING
-        binding.launchButton.alpha = if (state == VpnState.CONNECTING) 0.5f else 1f
-
-        val idle = state == VpnState.DISCONNECTED || state == VpnState.ERROR ||
-            state == VpnState.CONNECTED || state == VpnState.NO_RESPONSE
-        if (animationsEnabled && idle) {
-            startLaunchPulse()
-        } else {
-            stopLaunchPulse()
-        }
-    }
-
-    private fun startLaunchPulse() {
-        if (launchPulseAnimator != null) {
-            return
-        }
-        launchPulseAnimator = ValueAnimator.ofFloat(1f, 1.06f).apply {
-            duration = 900L
-            repeatMode = ValueAnimator.REVERSE
-            repeatCount = ValueAnimator.INFINITE
-            addUpdateListener {
-                val scale = it.animatedValue as Float
-                binding.launchButton.scaleX = scale
-                binding.launchButton.scaleY = scale
-            }
-            start()
-        }
-    }
-
-    private fun stopLaunchPulse() {
-        launchPulseAnimator?.cancel()
-        launchPulseAnimator = null
-        binding.launchButton.scaleX = 1f
-        binding.launchButton.scaleY = 1f
+        binding.connectButton.setState(buttonState)
+        binding.connectButton.contentDescription = description
     }
 
     private fun showMessage(message: String?) {

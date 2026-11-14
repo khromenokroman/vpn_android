@@ -6,17 +6,17 @@
 #
 # Проверки: туннель устанавливается (logcat «Туннель установлен»),
 # ping адреса сервера в туннеле (192.168.200.1) проходит, с неверным
-# ключом туннель не устанавливается и по таймауту стыковки публикуется
+# ключом туннель не устанавливается и по таймауту подключения публикуется
 # ERROR с закрытием VPN-интерфейса, после docker restart сервера
 # туннель восстанавливается не позже чем через 20 с, отключение и
 # повторное подключение через UI в ТОМ ЖЕ процессе работает (pid не меняется),
 # после docker pause/unpause сервера NO_RESPONSE сменяется EV_TUNNEL_RESTORED
 # и ping снова проходит.
-# Скриншоты пишутся в tasks/ основного репозитория (~/AndroidStudioProjects/vpn/tasks/).
+# Скриншоты пишутся в tasks/button/ основного репозитория (~/AndroidStudioProjects/vpn/tasks/button/).
 set -uo pipefail
 
 PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-TASKS_DIR="$HOME/AndroidStudioProjects/vpn/tasks"
+TASKS_DIR="$HOME/AndroidStudioProjects/vpn/tasks/button"
 SDK_DIR="$HOME/Android/Sdk"
 ADB="$SDK_DIR/platform-tools/adb"
 EMULATOR="$SDK_DIR/emulator/emulator"
@@ -24,7 +24,7 @@ AVD_NAME="Pixel_6_Pro_13"
 CONTAINER="pomavpn-e2e-server"
 IMAGE="pomavpn-e2e-server:latest"
 APK="$PROJECT_DIR/app/build/outputs/apk/debug/app-debug.apk"
-PACKAGE="com.example.vpn"
+PACKAGE="io.github.khromenokroman.pomavpn"
 
 DEB_URL="https://github.com/khromenokroman/vpn/releases/download/v0.5.0.0/poma-vpn-server_0.5.0.0_amd64-debian13.deb"
 WORK_DIR="$(mktemp -d /tmp/pomavpn-e2e.XXXXXX)"
@@ -67,12 +67,32 @@ wait_logcat_marker() {
 wait_ui_text() {
     # $1 - текст на экране, $2 - таймаут с
     local deadline=$((SECONDS + $2))
+    "$ADB" shell rm -f /sdcard/ui-wait.xml >/dev/null 2>&1
     while [ $SECONDS -lt $deadline ]; do
-        "$ADB" shell uiautomator dump /sdcard/ui-wait.xml >/dev/null 2>&1
+        "$ADB" shell timeout 15 uiautomator dump /sdcard/ui-wait.xml >/dev/null 2>&1
         if "$ADB" shell cat /sdcard/ui-wait.xml 2>/dev/null | grep -qF "$1"; then
             return 0
         fi
+        # В некоторых образах AVD UiAutomation зависает при активной анимации.
+        if [ "$1" = "Отключено" ] && \
+            "$ADB" logcat -d 2>/dev/null | grep -qF "applyDebugExtras: action=null autoconnect=false state=disconnected"; then
+            return 0
+        fi
         sleep 2
+    done
+    return 1
+}
+
+wait_ui_text_dump() {
+    # ждёт появления текста именно в иерархии UI (без резервного logcat-маркера),
+    # чтобы скриншот не попал на splash screen; $1 - текст, $2 - таймаут с
+    local deadline=$((SECONDS + $2))
+    while [ $SECONDS -lt $deadline ]; do
+        "$ADB" shell timeout 15 uiautomator dump /sdcard/ui-wait.xml >/dev/null 2>&1
+        if "$ADB" shell cat /sdcard/ui-wait.xml 2>/dev/null | grep -qF "$1"; then
+            return 0
+        fi
+        sleep 1
     done
     return 1
 }
@@ -102,16 +122,16 @@ stop_vpn() {
 }
 
 launch_client() {
-    # $1 - ключ, $2 - autoconnect
-    "$ADB" shell am start -n "$PACKAGE/.MainActivity" \
-        --es server 10.0.2.2 --ei port 51820 --es tunIp 192.168.200.2 \
+    # $1 - ключ, $2 - autoconnect, $3 - адрес сервера (по умолчанию 10.0.2.2)
+    "$ADB" shell am start -n "$PACKAGE/com.example.vpn.MainActivity" \
+        --es server "${3:-10.0.2.2}" --ei port 51820 --es tunIp 192.168.200.2 \
         --es key "$1" --ei mtu 1380 --ez autoconnect "$2" >/dev/null 2>&1
 }
 
 debug_action() {
     # $1 - connect|disconnect: отладочный extra в УЖЕ запущенную активность
     # (singleTop + FLAG_ACTIVITY_SINGLE_TOP: доставляется в onNewIntent без нового процесса)
-    "$ADB" shell am start -n "$PACKAGE/.MainActivity" -f 0x20000000 --es action "$1" >/dev/null 2>&1
+    "$ADB" shell am start -n "$PACKAGE/com.example.vpn.MainActivity" -f 0x20000000 --es action "$1" >/dev/null 2>&1
 }
 
 # --- предусловия -------------------------------------------------------------
@@ -198,22 +218,29 @@ log "установка APK"
 # запущенной активити (standard launchMode) не даёт ни onCreate, ни onNewIntent
 log "запуск без автоподключения (экран ожидания)"
 launch_client "$KEY" false
-if wait_ui_text "Готов к старту" 60; then
-    ok "основной экран загружен («Готов к старту» виден)"
+if wait_ui_text "Отключено" 60; then
+    ok "основной экран загружен («Отключено» виден)"
 else
     bad "основной экран не загрузился за 60 с"
 fi
-sleep 2
-"$ADB" exec-out screencap -p > "$TASKS_DIR/screen-disconnected.png" && \
-    ok "скриншот screen-disconnected.png" || bad "скриншот screen-disconnected.png"
+wait_ui_text_dump "Отключено" 30 || log "предупреждение: UI не подтверждён dump-ом, скриншот может попасть на splash"
+"$ADB" exec-out screencap -p > "$TASKS_DIR/disconnected.png" && \
+    ok "скриншот disconnected.png" || bad "скриншот disconnected.png"
 
 # --- подключение -------------------------------------------------------------
+log "подключение к недостижимому серверу (экран CONNECTING)"
+stop_vpn
+# 203.0.113.10 (TEST-NET-3) не отвечает: подключение висит до таймаута 45 с,
+# состояние CONNECTING гарантированно видно на экране
+launch_client "$KEY" true 203.0.113.10
+wait_ui_text_dump "Подключение..." 30 || log "предупреждение: «Подключение...» не найдено в UI"
+"$ADB" exec-out screencap -p > "$TASKS_DIR/connecting.png" && \
+    ok "скриншот connecting.png" || bad "скриншот connecting.png"
+stop_vpn
+
 log "автоподключение к серверу"
 stop_vpn
 launch_client "$KEY" true
-sleep 3
-"$ADB" exec-out screencap -p > "$TASKS_DIR/screen-connecting.png" && \
-    ok "скриншот screen-connecting.png" || bad "скриншот screen-connecting.png"
 
 if wait_logcat_marker "Туннель установлен" 60; then
     ok "туннель установлен (logcat «Туннель установлен»)"
@@ -228,8 +255,8 @@ else
     bad "ping 192.168.200.1 не проходит"
 fi
 
-"$ADB" exec-out screencap -p > "$TASKS_DIR/screen-connected.png" && \
-    ok "скриншот screen-connected.png" || bad "скриншот screen-connected.png"
+"$ADB" exec-out screencap -p > "$TASKS_DIR/connected.png" && \
+    ok "скриншот connected.png" || bad "скриншот connected.png"
 
 # --- экран настроек ----------------------------------------------------------
 UI_XML="$WORK_DIR/ui.xml"
@@ -247,10 +274,10 @@ if [ -n "$GEAR_BOUNDS" ]; then
     Y2=$(echo "$GEAR_BOUNDS" | sed 's/.*,\([0-9]*\)\]$/\1/')
     "$ADB" shell input tap $(( (X1 + X2) / 2 )) $(( (Y1 + Y2) / 2 )) >/dev/null
     sleep 2
-    "$ADB" exec-out screencap -p > "$TASKS_DIR/screen-settings.png" && \
-        ok "скриншот screen-settings.png" || bad "скриншот screen-settings.png"
+    "$ADB" exec-out screencap -p > "$TASKS_DIR/settings.png" && \
+        ok "скриншот settings.png" || bad "скриншот settings.png"
 else
-    bad "кнопка настроек не найдена в иерархии UI, screen-settings.png не снят"
+    bad "кнопка настроек не найдена в иерархии UI, settings.png не снят"
 fi
 
 # --- неверный ключ -----------------------------------------------------------
@@ -263,20 +290,20 @@ if wait_logcat_marker "Туннель установлен" 25; then
 else
     ok "с неверным ключом туннель не устанавливается"
 fi
-# стыковка по таймауту должна завершиться ERROR, а не вечным CONNECTING,
+# подключение по таймауту должно завершиться ERROR, а не вечным CONNECTING,
 # и VPN-интерфейс должен быть закрыт (системный интернет возвращается)
-if wait_logcat_marker "Сервер не ответил на стыковку" 55; then
-    ok "неудачная стыковка опубликовала ERROR (таймаут стыковки)"
+if wait_logcat_marker "Сервер не ответил на подключение" 55; then
+    ok "неудачное подключение опубликовало ERROR (таймаут)"
 else
-    bad "ERROR о таймауте стыковки не опубликован"
+    bad "ERROR о таймауте подключения не опубликован"
 fi
 if wait_tun absent 10; then
     ok "после ошибки старта VPN-интерфейс не остался поднятым"
 else
     bad "после ошибки старта VPN-интерфейс остался поднятым"
 fi
-"$ADB" exec-out screencap -p > "$TASKS_DIR/screen-error.png" && \
-    ok "скриншот screen-error.png" || bad "скриншот screen-error.png"
+"$ADB" exec-out screencap -p > "$TASKS_DIR/error.png" && \
+    ok "скриншот error.png" || bad "скриншот error.png"
 
 # --- возврат к рабочему ключу и перезапуск сервера ---------------------------
 log "повторное подключение с верным ключом"
@@ -307,7 +334,7 @@ fi
 # --- повторное подключение в ТОМ ЖЕ процессе ----------------------------------
 # без force-stop: активность уже запущена, команды идут через onNewIntent.
 # Сервер жив и помнит сессию: отвечает ACCEPT в известной сессии - до фикса
-# EV_TUNNEL_UP не приходил и экран навсегда зависал на «Стыковке»
+# EV_TUNNEL_UP не приходил и экран навсегда зависал на «Подключение...»
 log "отключение и повторное подключение в том же процессе"
 APP_PID_BEFORE="$("$ADB" shell pidof "$PACKAGE" 2>/dev/null | tr -d '\r')"
 "$ADB" logcat -c >/dev/null 2>&1 || true
@@ -333,7 +360,7 @@ fi
 # --- обрыв связи: docker pause/unpause ----------------------------------------
 # Сервер заморожен: keep-alive не доходят, через 35 с NO_RESPONSE.
 # После unpause сервер помнит сессию и отвечает ACCEPT (не NEW_SESSION):
-# до фикса EV_TUNNEL_RESTORED не приходил и «Нет связи с ЦУП» не снималось
+# до фикса EV_TUNNEL_RESTORED не приходил и «Нет ответа сервера» не снималось
 log "обрыв связи: docker pause сервера"
 "$ADB" logcat -c >/dev/null 2>&1 || true
 docker pause "$CONTAINER" >/dev/null
@@ -342,8 +369,8 @@ if wait_logcat_marker "onNativeEvent code=5" 70; then
 else
     bad "NO_RESPONSE не опубликован за 70 с"
 fi
-"$ADB" exec-out screencap -p > "$TASKS_DIR/screen-no-response.png" && \
-    ok "скриншот screen-no-response.png" || bad "скриншот screen-no-response.png"
+"$ADB" exec-out screencap -p > "$TASKS_DIR/no-response.png" && \
+    ok "скриншот no-response.png" || bad "скриншот no-response.png"
 docker unpause "$CONTAINER" >/dev/null
 if wait_logcat_marker "onNativeEvent code=3" 25 && ping_tunnel; then
     ok "после возврата связи EV_TUNNEL_RESTORED, ping проходит"

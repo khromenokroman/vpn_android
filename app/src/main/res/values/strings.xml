@@ -1,14 +1,13 @@
 <resources>
     <string name="app_name">PomaVPN</string>
 
-    <!-- Состояния полёта -->
-    <string name="state_ready">Готов к старту</string>
-    <string name="state_connecting">Стыковка...</string>
-    <string name="state_orbit">На орбите</string>
-    <string name="state_no_response">Нет связи с ЦУП</string>
-    <string name="state_landing">Посадка...</string>
-    <string name="state_accident">Авария</string>
-    <string name="state_disconnected">Готов к старту</string>
+    <!-- Состояния подключения -->
+    <string name="state_disconnected">Отключено</string>
+    <string name="state_connecting">Подключение...</string>
+    <string name="state_disconnecting">Отключение...</string>
+    <string name="state_connected">Подключено</string>
+    <string name="state_no_response">Нет ответа сервера</string>
+    <string name="state_error">Ошибка</string>
 
     <!-- Сообщения событий нативной части -->
     <string name="event_tunnel_up">Туннель установлен</string>
@@ -21,26 +20,32 @@
     <string name="error_start_failed">Не удалось запустить туннель (причина в журнале)</string>
     <string name="error_fatal">Связь прервана: %1$s</string>
     <string name="error_fatal_unknown">Связь прервана</string>
-    <string name="error_handshake_timeout">Сервер не ответил на стыковку за %1$d с</string>
+    <string name="error_handshake_timeout">Сервер не ответил за %1$d с: проверьте адрес, порт и ключ</string>
 
-    <!-- Кнопка запуска -->
-    <string name="launch_start">ПУСК</string>
-    <string name="launch_stop">ПОСАДКА</string>
-    <string name="launch_button_description">Кнопка запуска и посадки VPN</string>
+    <!-- Кнопка подключения -->
+    <string name="connect_label_start">Подключить</string>
+    <string name="connect_label_stop">Отключить</string>
+    <string name="connect_label_cancel">Отмена</string>
+    <string name="connect_button_description">Кнопка подключения и отключения VPN</string>
+    <string name="connect_cd_start">Подключить VPN</string>
+    <string name="connect_cd_connecting">Идёт подключение, нажмите чтобы отменить</string>
+    <string name="connect_cd_stop">Отключить VPN</string>
+    <string name="connect_cd_no_response">Нет ответа сервера, нажмите чтобы отключиться</string>
+    <string name="connect_cd_error">Ошибка подключения, нажмите чтобы подключиться заново</string>
 
     <!-- Телеметрия -->
     <string name="telemetry_line1">▲ %1$s   ▼ %2$s</string>
     <string name="telemetry_line2">Отброшено: %1$d</string>
     <string name="telemetry_fmt">%1$s\n%2$s</string>
     <string name="telemetry_empty">▲ 0 Б   ▼ 0 Б\nОтброшено: 0</string>
-    <string name="flight_time_fmt">Время в полёте: %1$s</string>
+    <string name="connection_time_fmt">В сети: %1$s</string>
     <string name="unit_bytes">Б</string>
     <string name="unit_kb">КБ</string>
     <string name="unit_mb">МБ</string>
     <string name="unit_gb">ГБ</string>
 
     <!-- Настройки -->
-    <string name="settings_title">Центр управления полётом</string>
+    <string name="settings_title">Настройки</string>
     <string name="settings_button_description">Настройки</string>
     <string name="hint_server_ip">Адрес сервера</string>
     <string name="hint_server_port">Порт</string>
@@ -55,11 +60,11 @@
     <!-- Уведомление -->
     <string name="notify_channel_name">VPN service</string>
     <string name="notify_channel_description">Состояние VPN-подключения</string>
-    <string name="notify_connecting">PomaVPN: стыковка...</string>
-    <string name="notify_connected">PomaVPN: на орбите</string>
-    <string name="notify_no_response">PomaVPN: нет связи с ЦУП</string>
+    <string name="notify_connecting">PomaVPN: подключение...</string>
+    <string name="notify_connected">PomaVPN: подключено</string>
+    <string name="notify_no_response">PomaVPN: нет ответа сервера</string>
 
     <!-- Прочее -->
     <string name="vpn_permission_missing">VPN-разрешение не выдано</string>
-    <string name="notification_permission_hint">Разрешите уведомления, чтобы видеть статус полёта</string>
+    <string name="notification_permission_hint">Разрешите уведомления, чтобы видеть статус подключения</string>
 </resources>
