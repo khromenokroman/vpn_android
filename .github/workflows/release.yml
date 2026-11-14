@@ -40,7 +40,8 @@ jobs:
 
       - name: Установка компонентов Android SDK
         run: |
-          yes | sdkmanager --install \
+          # на раннере sdkmanager есть, но не в PATH
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install \
             "ndk;28.2.13676358" \
             "cmake;3.22.1" \
             "platforms;android-36.1" \
