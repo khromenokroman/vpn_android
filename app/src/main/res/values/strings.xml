@@ -1,3 +1,70 @@
 <resources>
     <string name="app_name">PomaVPN</string>
+
+    <!-- Состояния подключения -->
+    <string name="state_disconnected">Отключено</string>
+    <string name="state_connecting">Подключение...</string>
+    <string name="state_disconnecting">Отключение...</string>
+    <string name="state_connected">Подключено</string>
+    <string name="state_no_response">Нет ответа сервера</string>
+    <string name="state_error">Ошибка</string>
+
+    <!-- Сообщения событий нативной части -->
+    <string name="event_tunnel_up">Туннель установлен</string>
+    <string name="event_tunnel_restarted">Сервер перезапущен, туннель восстановлен</string>
+    <string name="event_tunnel_restored">Связь с сервером восстановлена</string>
+    <string name="event_clock_skew">Часы телефона расходятся с сервером на %1$d с, допустимо 60 с</string>
+    <string name="event_old_protocol">Сервер старой версии (до 0.5.0.0)</string>
+
+    <!-- Ошибки -->
+    <string name="error_start_failed">Не удалось запустить туннель (причина в журнале)</string>
+    <string name="error_fatal">Связь прервана: %1$s</string>
+    <string name="error_fatal_unknown">Связь прервана</string>
+    <string name="error_handshake_timeout">Сервер не ответил за %1$d с: проверьте адрес, порт и ключ</string>
+
+    <!-- Кнопка подключения -->
+    <string name="connect_label_start">Подключить</string>
+    <string name="connect_label_stop">Отключить</string>
+    <string name="connect_label_cancel">Отмена</string>
+    <string name="connect_button_description">Кнопка подключения и отключения VPN</string>
+    <string name="connect_cd_start">Подключить VPN</string>
+    <string name="connect_cd_connecting">Идёт подключение, нажмите чтобы отменить</string>
+    <string name="connect_cd_stop">Отключить VPN</string>
+    <string name="connect_cd_no_response">Нет ответа сервера, нажмите чтобы отключиться</string>
+    <string name="connect_cd_error">Ошибка подключения, нажмите чтобы подключиться заново</string>
+
+    <!-- Телеметрия -->
+    <string name="telemetry_line1">▲ %1$s   ▼ %2$s</string>
+    <string name="telemetry_line2">Отброшено: %1$d</string>
+    <string name="telemetry_fmt">%1$s\n%2$s</string>
+    <string name="telemetry_empty">▲ 0 Б   ▼ 0 Б\nОтброшено: 0</string>
+    <string name="connection_time_fmt">В сети: %1$s</string>
+    <string name="unit_bytes">Б</string>
+    <string name="unit_kb">КБ</string>
+    <string name="unit_mb">МБ</string>
+    <string name="unit_gb">ГБ</string>
+
+    <!-- Настройки -->
+    <string name="settings_title">Настройки</string>
+    <string name="settings_button_description">Настройки</string>
+    <string name="hint_server_ip">Адрес сервера</string>
+    <string name="hint_server_port">Порт</string>
+    <string name="hint_client_ip">Адрес в туннеле</string>
+    <string name="hint_client_ip_detail">У каждого устройства должен быть свой адрес, например: 192.168.200.2, 192.168.200.3</string>
+    <string name="hint_key">Ключ</string>
+    <string name="hint_key_detail">Содержимое файла /etc/poma-vpn/key сервера</string>
+    <string name="hint_mtu">MTU</string>
+    <string name="save_settings">Сохранить настройки</string>
+    <string name="settings_saved">Настройки сохранены</string>
+
+    <!-- Уведомление -->
+    <string name="notify_channel_name">VPN service</string>
+    <string name="notify_channel_description">Состояние VPN-подключения</string>
+    <string name="notify_connecting">PomaVPN: подключение...</string>
+    <string name="notify_connected">PomaVPN: подключено</string>
+    <string name="notify_no_response">PomaVPN: нет ответа сервера</string>
+
+    <!-- Прочее -->
+    <string name="vpn_permission_missing">VPN-разрешение не выдано</string>
+    <string name="notification_permission_hint">Разрешите уведомления, чтобы видеть статус подключения</string>
 </resources>
